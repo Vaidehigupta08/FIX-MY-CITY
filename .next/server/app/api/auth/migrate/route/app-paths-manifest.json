@@ -1,0 +1,3 @@
+{
+  "/api/auth/migrate/route": "app/api/auth/migrate/route.js"
+}

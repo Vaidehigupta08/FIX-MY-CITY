@@ -1,0 +1,3 @@
+module.exports=[65603,a=>{"use strict";var b=a.i(64781),c=a.i(89982);let d=(0,c.createContext)(void 0);function e({children:a}){let[e,f]=(0,c.useState)({});return(0,b.jsx)(d.Provider,{value:{reportData:e,updateReportData:a=>{f(b=>({...b,...a}))},resetReport:()=>{f({})}},children:a})}function f(){let a=(0,c.useContext)(d);if(void 0===a)throw Error("useReport must be used within ReportProvider");return a}a.s(["ReportProvider",()=>e,"useReport",()=>f])}];
+
+//# sourceMappingURL=lib_report-context_tsx_7ea57529._.js.map
