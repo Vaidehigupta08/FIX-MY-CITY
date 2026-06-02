@@ -1,3 +1,0 @@
-module.exports=[29326,(a,b,c)=>{let{createClientModuleProxy:d}=a.r(48369);a.n(d("[project]/OneDrive/Desktop/Minor_Project/FIX-MY-CITY/node_modules/next/dist/client/components/builtin/global-error.js <module evaluation>"))},97777,(a,b,c)=>{let{createClientModuleProxy:d}=a.r(48369);a.n(d("[project]/OneDrive/Desktop/Minor_Project/FIX-MY-CITY/node_modules/next/dist/client/components/builtin/global-error.js"))},90743,a=>{"use strict";a.i(29326);var b=a.i(97777);a.n(b)}];
-
-//# sourceMappingURL=3a0e0_next_dist_client_components_builtin_global-error_1bddce58.js.map

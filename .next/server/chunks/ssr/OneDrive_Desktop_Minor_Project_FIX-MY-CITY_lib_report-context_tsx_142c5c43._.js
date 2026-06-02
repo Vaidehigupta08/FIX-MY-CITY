@@ -1,3 +1,0 @@
-module.exports=[28883,a=>{"use strict";var b=a.i(86798),c=a.i(58569);let d=(0,c.createContext)(void 0);function e({children:a}){let[e,f]=(0,c.useState)({});return(0,b.jsx)(d.Provider,{value:{reportData:e,updateReportData:a=>{f(b=>({...b,...a}))},resetReport:()=>{f({})}},children:a})}function f(){let a=(0,c.useContext)(d);if(void 0===a)throw Error("useReport must be used within ReportProvider");return a}a.s(["ReportProvider",()=>e,"useReport",()=>f])}];
-
-//# sourceMappingURL=OneDrive_Desktop_Minor_Project_FIX-MY-CITY_lib_report-context_tsx_142c5c43._.js.map
