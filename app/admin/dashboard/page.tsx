@@ -3,6 +3,12 @@
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/components/auth-context";
+import {
+  getLocalReports,
+  mergeAndStoreReports,
+  updateLocalReportStatus,
+  upsertLocalReport,
+} from "@/lib/client-persistence";
 import { getComplaintArea } from "@/lib/report-display";
 import type { ComplaintRecord } from "@/lib/types";
 import {
@@ -89,7 +95,9 @@ export default function AdminDashboardPage() {
 
         if (!active) return;
 
-        const reports = Array.isArray(data.reports) ? (data.reports as ComplaintRecord[]) : [];
+        const reports = mergeAndStoreReports(
+          Array.isArray(data.reports) ? (data.reports as ComplaintRecord[]) : [],
+        );
         const visibleReports = user.department
           ? reports.filter((report) => report.assignedDepartment === user.department)
           : reports;
@@ -103,9 +111,20 @@ export default function AdminDashboardPage() {
       } catch (err) {
         if (!active) return;
 
-        setComplaints([]);
-        setDraftStatuses({});
-        setError(err instanceof Error ? err.message : "Failed to load complaints.");
+        const reports = getLocalReports();
+        const visibleReports = user.department
+          ? reports.filter((report) => report.assignedDepartment === user.department)
+          : reports;
+
+        setComplaints(visibleReports);
+        setDraftStatuses(
+          Object.fromEntries(
+            visibleReports.map((report) => [report.ticketId, report.status as DashboardStatus]),
+          ),
+        );
+        if (visibleReports.length === 0) {
+          setError(err instanceof Error ? err.message : "Failed to load complaints.");
+        }
       } finally {
         if (active) {
           setIsFetchingComplaints(false);
@@ -184,6 +203,7 @@ export default function AdminDashboardPage() {
       }
 
       const updatedComplaint = data.report as ComplaintRecord;
+      upsertLocalReport(updatedComplaint);
       setComplaints((currentComplaints) =>
         currentComplaints.map((complaint) =>
           complaint.ticketId === updatedComplaint.ticketId ? updatedComplaint : complaint,
@@ -194,7 +214,16 @@ export default function AdminDashboardPage() {
         [ticketId]: updatedComplaint.status as DashboardStatus,
       }));
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to update complaint status.");
+      try {
+        const updatedComplaint = updateLocalReportStatus(ticketId, selectedStatus);
+        setComplaints((currentComplaints) =>
+          currentComplaints.map((complaint) =>
+            complaint.ticketId === updatedComplaint.ticketId ? updatedComplaint : complaint,
+          ),
+        );
+      } catch {
+        setError(err instanceof Error ? err.message : "Failed to update complaint status.");
+      }
     } finally {
       setUpdatingTicketId(null);
     }

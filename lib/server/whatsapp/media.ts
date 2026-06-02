@@ -1,3 +1,4 @@
+import os from "node:os";
 import { mkdir, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { getWhatsAppConfig } from "@/lib/server/whatsapp/config";
@@ -107,7 +108,8 @@ export async function downloadAndStoreWhatsAppImage({
     throw new Error("WhatsApp image is too large.");
   }
 
-  const uploadDirectory = path.join(process.cwd(), "public", "uploads", "whatsapp");
+  const uploadRoot = process.env.VERCEL ? os.tmpdir() : path.join(process.cwd(), "public");
+  const uploadDirectory = path.join(uploadRoot, "uploads", "whatsapp");
   await mkdir(uploadDirectory, { recursive: true });
 
   const safeMediaId = sanitizeFileSegment(mediaId);

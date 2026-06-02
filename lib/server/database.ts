@@ -1,9 +1,11 @@
 import { mkdir, readFile, writeFile } from "node:fs/promises";
+import os from "node:os";
 import path from "node:path";
 import type { AppDatabase, StoredUser } from "@/lib/types";
 import { buildSeedAdminUsers } from "@/lib/server/departments";
 
-const DB_DIRECTORY = path.join(process.cwd(), "data");
+const DB_ROOT = process.env.VERCEL ? os.tmpdir() : process.cwd();
+const DB_DIRECTORY = path.join(DB_ROOT, "data");
 const DB_FILE = path.join(DB_DIRECTORY, "fix-my-city-db.json");
 
 const DEFAULT_DATABASE: AppDatabase = {

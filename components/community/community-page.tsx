@@ -7,6 +7,12 @@ import { useTheme } from "@/lib/theme-provider"
 import { Search, MapPin, ThumbsUp, MessageCircle } from "lucide-react"
 import { useAuth } from "@/components/auth-context"
 import { getCommunityActorId, UPVOTED_STORAGE_KEY } from "@/lib/community-engagement"
+import {
+  getLocalReports,
+  mergeAndStoreReports,
+  toggleLocalReportUpvote,
+  upsertLocalReport,
+} from "@/lib/client-persistence"
 import { getComplaintArea, getComplaintLocationLabel } from "@/lib/report-display"
 import type { ComplaintRecord } from "@/lib/types"
 
@@ -83,11 +89,15 @@ export function CommunityPage() {
         }
 
         if (active) {
-          setIssues(Array.isArray(data.reports) ? data.reports : [])
+          setIssues(mergeAndStoreReports(Array.isArray(data.reports) ? data.reports : []))
         }
       } catch (err) {
         if (active) {
-          setError(err instanceof Error ? err.message : "Failed to load community issues.")
+          const localReports = getLocalReports()
+          setIssues(localReports)
+          if (localReports.length === 0) {
+            setError(err instanceof Error ? err.message : "Failed to load community issues.")
+          }
         }
       } finally {
         if (active) {
@@ -195,6 +205,7 @@ export function CommunityPage() {
 
       const updatedIssue = data.report as ComplaintRecord
       const liked = Boolean(data.liked)
+      upsertLocalReport(updatedIssue)
       setIssues((currentIssues) =>
         currentIssues.map((issue) =>
           issue.ticketId === updatedIssue.ticketId ? updatedIssue : issue,
@@ -209,10 +220,25 @@ export function CommunityPage() {
       window.localStorage.setItem(UPVOTED_STORAGE_KEY, JSON.stringify(confirmedUpvotedIssues))
       console.info("[community] like toggle saved", { ticketId, liked })
     } catch (err) {
-      setUpvotedIssues(upvotedIssues)
-      setIssues(previousIssues)
-      window.localStorage.setItem(UPVOTED_STORAGE_KEY, JSON.stringify(upvotedIssues))
-      setError(err instanceof Error ? err.message : "Failed to update like.")
+      try {
+        const { complaint: localIssue, liked } = toggleLocalReportUpvote(ticketId, actorId)
+        const confirmedUpvotedIssues = liked
+          ? Array.from(new Set([...upvotedIssues, ticketId]))
+          : upvotedIssues.filter((id) => id !== ticketId)
+
+        setIssues((currentIssues) =>
+          currentIssues.map((issue) =>
+            issue.ticketId === localIssue.ticketId ? localIssue : issue,
+          ),
+        )
+        setUpvotedIssues(confirmedUpvotedIssues)
+        window.localStorage.setItem(UPVOTED_STORAGE_KEY, JSON.stringify(confirmedUpvotedIssues))
+      } catch {
+        setUpvotedIssues(upvotedIssues)
+        setIssues(previousIssues)
+        window.localStorage.setItem(UPVOTED_STORAGE_KEY, JSON.stringify(upvotedIssues))
+        setError(err instanceof Error ? err.message : "Failed to update like.")
+      }
     } finally {
       setPendingUpvoteTicketId(null)
     }

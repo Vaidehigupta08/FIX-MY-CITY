@@ -4,6 +4,7 @@ import { useState } from "react"
 import { useRouter } from "next/navigation"
 import { useReport } from "@/lib/report-context"
 import { useAuth } from "@/components/auth-context"
+import { createLocalFallbackComplaint, upsertLocalReport } from "@/lib/client-persistence"
 import { ArrowLeft, ArrowRight, Edit2 } from "lucide-react"
 
 export function ReviewSubmitPage() {
@@ -57,11 +58,30 @@ export function ReviewSubmitPage() {
         throw new Error(result?.error || "Failed to submit complaint.")
       }
 
+      if (result?.report) {
+        upsertLocalReport(result.report)
+      }
       updateReportData({ tokenId: result.ticketId })
       router.push(`/report/success?token=${result.ticketId}`)
     } catch (error) {
-      setSubmitError(error instanceof Error ? error.message : "Failed to submit complaint.")
-      setIsSubmitting(false)
+      const fallbackComplaint = createLocalFallbackComplaint({
+        userEmail: payload.userEmail,
+        userName: payload.userName,
+        category: payload.category || "General Issue",
+        description: payload.description || "Complaint submitted from the report flow.",
+        address: payload.address,
+        exactLocation: payload.exactLocation,
+        landmark: payload.landmark,
+        city: payload.city,
+        pincode: payload.pincode,
+        urgency: payload.urgency || "Medium",
+        photoUrl: payload.photoUrl,
+        imageUrl: payload.imageUrl,
+        latitude: payload.latitude,
+        longitude: payload.longitude,
+      })
+      updateReportData({ tokenId: fallbackComplaint.ticketId })
+      router.push(`/report/success?token=${fallbackComplaint.ticketId}`)
     }
   }
 

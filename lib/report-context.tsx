@@ -14,6 +14,9 @@ export interface ReportData {
   description?: string
   urgency?: "Low" | "Medium" | "High"
   photoUrl?: string
+  imageUrl?: string
+  latitude?: number
+  longitude?: number
   tokenId?: string
   userEmail?: string
   userName?: string

@@ -7,6 +7,15 @@ import React, {
   useState,
 } from "react";
 import type { AppUser, Profile, Role } from "@/lib/types";
+import {
+  createLocalUser,
+  findLocalUser,
+  loginLocalUser,
+  normalizeEmail,
+  sanitizeUser,
+  updateLocalUserProfile,
+  upsertLocalUserRecord,
+} from "@/lib/client-persistence";
 
 export type User = AppUser | null;
 
@@ -47,10 +56,6 @@ const AUTH_COOKIE_KEY = "fmc_auth";
 const ROLE_COOKIE_KEY = "fmc_role";
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
-
-function normalizeEmail(email: string) {
-  return email.trim().toLowerCase();
-}
 
 function persistSession(nextUser: NonNullable<User>) {
   window.localStorage.setItem(SESSION_STORAGE_KEY, JSON.stringify(nextUser));
@@ -140,12 +145,30 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             const data = await response.json();
             nextUser = data.user ?? null;
             nextProfile = data.profile ?? null;
+            if (nextUser) {
+              upsertLocalUserRecord(nextUser, nextProfile);
+            }
           } else {
-            clearSession();
+            const localUser = findLocalUser(parsedSession.email);
+            if (localUser) {
+              nextUser = sanitizeUser(localUser);
+              nextProfile = localUser.profile;
+            } else {
+              clearSession();
+            }
           }
         }
       } catch {
-        clearSession();
+        const savedSession = window.localStorage.getItem(SESSION_STORAGE_KEY);
+        const parsedSession = savedSession ? (JSON.parse(savedSession) as NonNullable<User>) : null;
+        const localUser = parsedSession ? findLocalUser(parsedSession.email) : null;
+
+        if (localUser) {
+          nextUser = sanitizeUser(localUser);
+          nextProfile = localUser.profile;
+        } else {
+          clearSession();
+        }
       }
 
       if (!active) return;
@@ -165,56 +188,81 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const updateProfile = async (data: NonNullable<Profile>) => {
     if (!user) return;
 
-    const response = await fetch("/api/profile", {
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        email: user.email,
-        profile: data,
-      }),
-    });
+    try {
+      const response = await fetch("/api/profile", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          email: user.email,
+          profile: data,
+        }),
+      });
 
-    const parsed = await parseJsonResponse(response);
-    setUser(parsed.user ?? user);
-    setProfile(parsed.profile ?? data);
+      const parsed = await parseJsonResponse(response);
+      setUser(parsed.user ?? user);
+      setProfile(parsed.profile ?? data);
+      upsertLocalUserRecord(parsed.user ?? user, parsed.profile ?? data);
+    } catch {
+      const updatedUser = updateLocalUserProfile(user.email, data);
+      setUser(sanitizeUser(updatedUser));
+      setProfile(updatedUser.profile);
+    }
   };
 
   const login = async ({ email, password, role }: LoginInput) => {
-    const response = await fetch("/api/auth/login", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        email: normalizeEmail(email),
-        password,
-        role,
-      }),
-    });
+    try {
+      const response = await fetch("/api/auth/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          email: normalizeEmail(email),
+          password,
+          role,
+        }),
+      });
 
-    const parsed = await parseJsonResponse(response);
-    const nextUser = parsed.user as NonNullable<User>;
+      const parsed = await parseJsonResponse(response);
+      const nextUser = parsed.user as NonNullable<User>;
 
-    persistSession(nextUser);
-    setUser(nextUser);
-    setProfile(parsed.profile ?? null);
+      persistSession(nextUser);
+      setUser(nextUser);
+      setProfile(parsed.profile ?? null);
+      upsertLocalUserRecord(nextUser, parsed.profile ?? null);
+    } catch {
+      const localUser = await loginLocalUser({ email, password, role });
+      const nextUser = sanitizeUser(localUser);
+      persistSession(nextUser);
+      setUser(nextUser);
+      setProfile(localUser.profile);
+    }
   };
 
   const signup = async ({ name, email, password }: SignupInput) => {
-    const response = await fetch("/api/auth/signup", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        name: name.trim(),
-        email: normalizeEmail(email),
-        password,
-      }),
-    });
+    try {
+      const response = await fetch("/api/auth/signup", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: name.trim(),
+          email: normalizeEmail(email),
+          password,
+        }),
+      });
 
-    const parsed = await parseJsonResponse(response);
-    const nextUser = parsed.user as NonNullable<User>;
+      const parsed = await parseJsonResponse(response);
+      const nextUser = parsed.user as NonNullable<User>;
 
-    persistSession(nextUser);
-    setUser(nextUser);
-    setProfile(parsed.profile ?? null);
+      persistSession(nextUser);
+      setUser(nextUser);
+      setProfile(parsed.profile ?? null);
+      upsertLocalUserRecord(nextUser, parsed.profile ?? null);
+    } catch {
+      const localUser = await createLocalUser({ name, email, password });
+      const nextUser = sanitizeUser(localUser);
+      persistSession(nextUser);
+      setUser(nextUser);
+      setProfile(localUser.profile);
+    }
   };
 
   const logout = () => {

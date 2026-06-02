@@ -7,6 +7,12 @@ import { useParams } from "next/navigation"
 import { ArrowLeft, Loader2, MapPin, MessageCircle, Phone, Send, ThumbsUp } from "lucide-react"
 import { useAuth } from "@/components/auth-context"
 import { getCommunityActorId } from "@/lib/community-engagement"
+import {
+  addLocalReportComment,
+  findLocalReport,
+  mergeAndStoreReports,
+  upsertLocalReport,
+} from "@/lib/client-persistence"
 import { getComplaintLocationLabel } from "@/lib/report-display"
 import type { ComplaintComment, ComplaintRecord } from "@/lib/types"
 import { ComplaintDetails } from "@/components/track/complaint-details"
@@ -53,7 +59,7 @@ export function CommunityIssueDetailsPage() {
         }
 
         const report = Array.isArray(data.reports)
-          ? (data.reports as ComplaintRecord[]).find((entry) => entry.ticketId === ticketId)
+          ? mergeAndStoreReports(data.reports as ComplaintRecord[]).find((entry) => entry.ticketId === ticketId)
           : null
 
         if (!report) {
@@ -65,7 +71,12 @@ export function CommunityIssueDetailsPage() {
         }
       } catch (err) {
         if (active) {
-          setError(err instanceof Error ? err.message : "Failed to load issue details.")
+          const report = findLocalReport(ticketId)
+          if (report) {
+            setComplaint(report)
+          } else {
+            setError(err instanceof Error ? err.message : "Failed to load issue details.")
+          }
         }
       } finally {
         if (active) {
@@ -146,14 +157,25 @@ export function CommunityIssueDetailsPage() {
       }
 
       setComplaint(data.report as ComplaintRecord)
+      upsertLocalReport(data.report as ComplaintRecord)
       console.info("[community] comment saved", {
         ticketId: complaint.ticketId,
         commentId: data.comment?.id,
       })
     } catch (err) {
-      setComplaint(previousComplaint)
-      setCommentText(body)
-      setCommentError(err instanceof Error ? err.message : "Failed to submit comment.")
+      try {
+        const { complaint: localComplaint } = addLocalReportComment({
+          ticketId: complaint.ticketId,
+          authorId: nextActorId,
+          authorName: user?.name || "Community Member",
+          body,
+        })
+        setComplaint(localComplaint)
+      } catch {
+        setComplaint(previousComplaint)
+        setCommentText(body)
+        setCommentError(err instanceof Error ? err.message : "Failed to submit comment.")
+      }
     } finally {
       setIsSubmittingComment(false)
     }

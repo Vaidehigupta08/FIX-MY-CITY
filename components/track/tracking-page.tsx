@@ -7,6 +7,7 @@ import { Search, MapPin, Phone, Upload, ThumbsUp } from "lucide-react"
 import { ComplaintDetails } from "./complaint-details"
 import { StatusTimeline } from "./status-timeline"
 import { useAuth } from "@/components/auth-context"
+import { findLocalReportForUser, upsertLocalReport } from "@/lib/client-persistence"
 import { getComplaintLocationLabel } from "@/lib/report-display"
 import type { ComplaintRecord } from "@/lib/types"
 
@@ -36,12 +37,16 @@ export function TrackingPage() {
         throw new Error(data?.error || "Complaint not found.")
       }
 
+      if (data.report) {
+        upsertLocalReport(data.report)
+      }
       setComplaint(data.report ?? null)
       setSearchSubmitted(true)
     } catch (err) {
-      setComplaint(null)
+      const localComplaint = findLocalReportForUser(nextTicketId, user.email, user.role)
+      setComplaint(localComplaint)
       setSearchSubmitted(true)
-      setError(err instanceof Error ? err.message : "Complaint not found.")
+      setError(localComplaint ? null : err instanceof Error ? err.message : "Complaint not found.")
     } finally {
       setIsLoading(false)
     }
